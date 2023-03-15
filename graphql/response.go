@@ -15,6 +15,9 @@ type Response struct {
 	Errors     gqlerror.List          `json:"errors,omitempty"`
 	Data       json.RawMessage        `json:"data"`
 	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	HasNext    bool                   `json:"hasNext"`
+	Path       []string               `json:"path,omitempty"`
+	Label      string                 `json:"label,omitempty"`
 }
 
 func ErrorResponse(ctx context.Context, messagef string, args ...interface{}) *Response {

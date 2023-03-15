@@ -9,6 +9,7 @@ type FieldSet struct {
 	fields  []CollectedField
 	Values  []Marshaler
 	delayed []delayedResult
+	defered map[int]CollectedField
 }
 
 type delayedResult struct {
@@ -18,13 +19,18 @@ type delayedResult struct {
 
 func NewFieldSet(fields []CollectedField) *FieldSet {
 	return &FieldSet{
-		fields: fields,
-		Values: make([]Marshaler, len(fields)),
+		fields:  fields,
+		Values:  make([]Marshaler, len(fields)),
+		defered: make(map[int]CollectedField),
 	}
 }
 
 func (m *FieldSet) Concurrently(i int, f func() Marshaler) {
 	m.delayed = append(m.delayed, delayedResult{i: i, f: f})
+}
+
+func (m *FieldSet) Defered(i int, f CollectedField) {
+	m.defered[i] = f
 }
 
 func (m *FieldSet) Dispatch() {
@@ -51,10 +57,18 @@ func (m *FieldSet) Dispatch() {
 
 func (m *FieldSet) MarshalGQL(writer io.Writer) {
 	writer.Write(openBrace)
+	var prevDefered bool
 	for i, field := range m.fields {
-		if i != 0 {
+		if _, ok := m.defered[i]; ok {
+			prevDefered = true
+			continue
+		}
+
+		if i != 0 && !prevDefered {
 			writer.Write(comma)
 		}
+		prevDefered = false
+
 		writeQuotedString(writer, field.Alias)
 		writer.Write(colon)
 		m.Values[i].MarshalGQL(writer)

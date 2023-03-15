@@ -257,6 +257,7 @@
 	{{- range $source := .AugmentedSources }}
 		{Name: {{$source.RelativePath|quote}}, Input: {{if (not $source.Embeddable)}}{{$source.Source|rawQuote}}{{else}}sourceData({{$source.RelativePath|quote}}){{end}}, BuiltIn: {{$source.BuiltIn}}},
 	{{- end }}
+		{Name: "", Input: `directive @defer(label: String!) on FRAGMENT_SPREAD|INLINE_FRAGMENT`, BuiltIn: true},
 	}
 	var parsedSchema = gqlparser.MustLoadSchema(sources...)
 {{ end }}

@@ -72,13 +72,27 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
                     }
                 {{end}}
 
-                out.Concurrently(i, func() graphql.Marshaler {
-                    {{- if $object.Root -}}
-                        return rrm(innerCtx)
-                    {{- else -}}
-                        return innerFunc(ctx)
-                    {{end}}
-                })
+                if field.Defered {
+                    out.Defered(i, field)
+                    label := field.DeferedLabel
+                    path := graphql.GetPathFromFieldContext(ctx)
+                    path = append(path, "{{$field.Name}}")
+                    ec.OperationContext.Defer(label, path, field, func() graphql.Marshaler {
+                        {{- if $object.Root -}}
+                            return rrm(innerCtx)
+                        {{- else -}}
+                            return innerFunc(ctx)
+                        {{- end}}
+                    })
+                } else {
+                    out.Concurrently(i, func() graphql.Marshaler {
+                        {{- if $object.Root -}}
+                            return rrm(innerCtx)
+                        {{- else -}}
+                            return innerFunc(ctx)
+                        {{- end}}
+                    })
+                }
             {{- else }}
                 {{if $object.Root}}
                     out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {

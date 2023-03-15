@@ -26,6 +26,8 @@ type OperationContext struct {
 	RootResolverMiddleware RootFieldMiddleware
 
 	Stats Stats
+
+	Defered []DeferedResolver
 }
 
 func (c *OperationContext) Validate(ctx context.Context) error {
@@ -49,6 +51,10 @@ func (c *OperationContext) Validate(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *OperationContext) Defer(label string, path []string, field CollectedField, f func() Marshaler) {
+	c.Defered = append(c.Defered, DeferedResolver{label, path, field, f})
 }
 
 const operationCtx key = "operation_context"

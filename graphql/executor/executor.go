@@ -1,7 +1,9 @@
 package executor
 
 import (
+	"bytes"
 	"context"
+	"sync"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/errcode"
@@ -50,6 +52,7 @@ func (e *Executor) CreateOperationContext(
 			Read:           params.ReadTime,
 			OperationStart: graphql.GetStartTime(ctx),
 		},
+		Defered: []graphql.DeferedResolver{},
 	}
 	ctx = graphql.WithOperationContext(ctx, rc)
 
@@ -128,11 +131,53 @@ func (e *Executor) DispatchOperation(
 				return nil
 			}
 
+			if len(rc.Defered) != 0 {
+				resp.HasNext = true
+			}
+
 			return resp
 		}
 	})
 
 	return res, innerCtx
+}
+
+func (e *Executor) DispatchDefered(ctx context.Context, rc *graphql.OperationContext) (int, <-chan graphql.ResponseHandler) {
+	toProc := len(rc.Defered)
+	rhChan := make(chan graphql.ResponseHandler, toProc)
+
+	var wg sync.WaitGroup
+	wg.Add(toProc)
+
+	for _, defered := range rc.Defered {
+		go func(d graphql.DeferedResolver) {
+			defer wg.Done()
+			ctx = graphql.WithResponseContext(ctx, e.errorPresenter, e.recoverFunc)
+			resp := e.ext.responseMiddleware(ctx, func(ctx context.Context) *graphql.Response {
+				buf := bytes.NewBuffer(nil)
+				d.Resolver().MarshalGQL(buf)
+
+				resp := &graphql.Response{}
+				resp.Path = d.Path
+				resp.Label = d.Label
+				resp.Data = buf.Bytes()
+				resp.Errors = append(resp.Errors, graphql.GetErrors(ctx)...)
+				resp.Extensions = graphql.GetExtensions(ctx)
+				return resp
+			})
+
+			rhChan <- func(ctx context.Context) *graphql.Response {
+				return resp
+			}
+		}(defered)
+	}
+
+	go func() {
+		wg.Wait()
+		close(rhChan)
+	}()
+
+	return toProc, rhChan
 }
 
 func (e *Executor) DispatchError(ctx context.Context, list gqlerror.List) *graphql.Response {

@@ -45,6 +45,7 @@ func collectFields(reqCtx *OperationContext, selSet ast.SelectionSet, satisfies 
 			if len(satisfies) > 0 && !instanceOf(sel.TypeCondition, satisfies) {
 				continue
 			}
+
 			for _, childField := range collectFields(reqCtx, sel.SelectionSet, satisfies, visited) {
 				f := getOrCreateAndAppendField(&groupedFields, childField.Name, childField.Alias, childField.ObjectDefinition, func() CollectedField { return childField })
 				f.Selections = append(f.Selections, childField.Selections...)
@@ -70,7 +71,15 @@ func collectFields(reqCtx *OperationContext, selSet ast.SelectionSet, satisfies 
 				continue
 			}
 
+			defered := sel.Directives.ForName("defer")
+
 			for _, childField := range collectFields(reqCtx, fragment.SelectionSet, satisfies, visited) {
+				if defered != nil {
+					childField.Defered = true
+					if label := defered.Arguments.ForName("label"); label != nil {
+						childField.DeferedLabel = label.Value.Raw
+					}
+				}
 				f := getOrCreateAndAppendField(&groupedFields, childField.Name, childField.Alias, childField.ObjectDefinition, func() CollectedField { return childField })
 				f.Selections = append(f.Selections, childField.Selections...)
 			}
@@ -86,7 +95,9 @@ func collectFields(reqCtx *OperationContext, selSet ast.SelectionSet, satisfies 
 type CollectedField struct {
 	*ast.Field
 
-	Selections ast.SelectionSet
+	Selections   ast.SelectionSet
+	Defered      bool
+	DeferedLabel string
 }
 
 func instanceOf(val string, satisfies []string) bool {
@@ -128,6 +139,13 @@ func getOrCreateAndAppendField(c *[]CollectedField, name string, alias string, o
 
 	f := creator()
 
+	if defered := objectDefinition.Directives.ForName("defer"); defered != nil {
+		f.Defered = true
+		if label := defered.Arguments.ForName("label"); label != nil {
+			f.DeferedLabel = label.Value.Raw
+		}
+	}
+
 	*c = append(*c, f)
 	return &(*c)[len(*c)-1]
 }
@@ -137,7 +155,7 @@ func shouldIncludeNode(directives ast.DirectiveList, variables map[string]interf
 		return true
 	}
 
-	skip, include := false, true
+	skip, include, defered := false, true, false
 
 	if d := directives.ForName("skip"); d != nil {
 		skip = resolveIfArgument(d, variables)
@@ -147,7 +165,12 @@ func shouldIncludeNode(directives ast.DirectiveList, variables map[string]interf
 		include = resolveIfArgument(d, variables)
 	}
 
-	return !skip && include
+	if d := directives.ForName("defer"); d != nil {
+		defered = true
+		skip = false
+	}
+
+	return !skip && (include || defered)
 }
 
 func resolveIfArgument(d *ast.Directive, variables map[string]interface{}) bool {

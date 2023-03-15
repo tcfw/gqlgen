@@ -82,7 +82,15 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 		return
 	}
 
-	var responses graphql.ResponseHandler
-	responses, ctx = exec.DispatchOperation(ctx, rc)
-	writeJson(w, responses(ctx))
+	rh, ctx := exec.DispatchOperation(ctx, rc)
+	responses := rh(ctx)
+
+	if len(rc.Defered) != 0 {
+		c, rhc := exec.DispatchDefered(ctx, rc)
+		dWriter := NewDeferedMultipartWriter(w, c, exec, rhc)
+		dWriter.First(responses)
+		dWriter.Dispatch(ctx, w)
+	} else {
+		writeJson(w, responses)
+	}
 }
