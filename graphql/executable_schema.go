@@ -46,7 +46,15 @@ func collectFields(reqCtx *OperationContext, selSet ast.SelectionSet, satisfies 
 				continue
 			}
 
+			defered := sel.Directives.ForName("defer")
+
 			for _, childField := range collectFields(reqCtx, sel.SelectionSet, satisfies, visited) {
+				if defered != nil {
+					childField.Defered = true
+					if label := defered.Arguments.ForName("label"); label != nil {
+						childField.DeferedLabel = label.Value.Raw
+					}
+				}
 				f := getOrCreateAndAppendField(&groupedFields, childField.Name, childField.Alias, childField.ObjectDefinition, func() CollectedField { return childField })
 				f.Selections = append(f.Selections, childField.Selections...)
 			}

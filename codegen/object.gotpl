@@ -31,6 +31,7 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
         })
     {{end}}
 	out := graphql.NewFieldSet(fields)
+    defered := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
         {{- if $object.Root }}
@@ -77,7 +78,8 @@ func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.Selec
                     label := field.DeferedLabel
                     path := graphql.GetPathFromFieldContext(ctx)
                     path = append(path, "{{$field.Name}}")
-                    ec.OperationContext.Defer(label, path, field, func() graphql.Marshaler {
+                    //ec.OperationContext.Defer(label, path, field, 
+                    defered.Concurrently(func() graphql.Marshaler {
                         {{- if $object.Root -}}
                             return rrm(innerCtx)
                         {{- else -}}

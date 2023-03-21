@@ -8,7 +8,8 @@ type (
 	DeferedResolver struct {
 		Label    string
 		Path     []string
-		Field    CollectedField
+		Field    *CollectedField
+		FieldSet *FieldSet
 		Resolver func() Marshaler
 	}
 )

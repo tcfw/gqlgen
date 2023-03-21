@@ -53,8 +53,20 @@ func (c *OperationContext) Validate(ctx context.Context) error {
 	return nil
 }
 
-func (c *OperationContext) Defer(label string, path []string, field CollectedField, f func() Marshaler) {
-	c.Defered = append(c.Defered, DeferedResolver{label, path, field, f})
+func (c *OperationContext) Defer(label string, path []string, field *CollectedField, f func() Marshaler) {
+	c.Defered = append(c.Defered, DeferedResolver{
+		Label:    label,
+		Path:     path,
+		Field:    field,
+		Resolver: f})
+}
+
+func (c *OperationContext) DeferSet(label string, path []string, fs *FieldSet) {
+	c.Defered = append(c.Defered, DeferedResolver{
+		Label:    label,
+		Path:     path,
+		FieldSet: fs,
+	})
 }
 
 const operationCtx key = "operation_context"
